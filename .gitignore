@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Build output / caches
+dist/
+build/
+.cache/
+tmp/
+temp/
+
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# React Native iOS/Android
+Biometrics/ios/Pods/
+Biometrics/ios/build/
+Biometrics/ios/Biometrics.xcodeproj/xcuserdata/
+Biometrics/ios/Biometrics.xcworkspace/xcuserdata/
+Biometrics/android/.gradle/
+Biometrics/android/.cxx/
+Biometrics/android/**/build/
+Biometrics/android/local.properties
+
+
