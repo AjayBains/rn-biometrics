@@ -1,11 +1,19 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useContext } from 'react';
+import { View, Text, StyleSheet, Button } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { AuthContext } from '../context/AuthContext';
 
 export default function Home() {
+  const navigation = useNavigation()
+  const { email, logout } = useContext(AuthContext)
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome</Text>
-      <Text>You are authenticated.</Text>
+      <Text>You are authenticated{email ? ` as ${email}` : ''}.</Text>
+      <View style={{ height: 12 }} />
+      <Button title="Settings" onPress={() => navigation.navigate('Settings')} />
+      <View style={{ height: 12 }} />
+      <Button title="Logout" onPress={logout} />
     </View>
   );
 }

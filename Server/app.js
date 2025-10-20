@@ -5,6 +5,7 @@ const authRoutes = require('./routes/authRoutes')
 
 const app = express()
 const port = 3000
+const host = '0.0.0.0'
 
 const mongoUrl = process.env.MONGO_URL
 
@@ -18,6 +19,16 @@ let server
 
 app.use(express.json())
 
+// minimal request logging
+app.use((req, res, next) => {
+  const started = Date.now()
+  res.on('finish', () => {
+    const ms = Date.now() - started
+    console.log('[REQ]', req.ip, req.method, req.originalUrl, res.statusCode, `${ms}ms`)
+  })
+  next()
+})
+
 app.get('/', (req, res) => {
   res.send('Hello World!')
 })
@@ -28,8 +39,9 @@ async function start() {
   try {
     await client.connect()
     app.locals.db = client.db()
-    server = app.listen(port, () => {
-      console.log(`Example app listening on port ${port}`)
+    server = app.listen(port, host, () => {
+      console.log(`Server listening on http://${host}:${port}`)
+      console.log('If on a LAN, use your Mac\'s IP, e.g. http://192.168.x.x:3000')
     })
   } catch (err) {
     console.error('Failed to connect to MongoDB', err)
