@@ -5,6 +5,7 @@ const {
   biometricRegister,
   biometricChallenge,
   biometricVerify,
+  biometricDeregister,
 } = require('../controllers/authController')
 const jwt = require('jsonwebtoken')
 
@@ -37,6 +38,10 @@ router.post('/biometric/register', (req, res, next) => {
 // Biometric login challenge + verify
 router.post('/biometric/challenge', biometricChallenge)
 router.post('/biometric/verify', biometricVerify)
+router.post('/biometric/deregister', (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'unauthorized' })
+  return biometricDeregister(req, res, next)
+})
 
 module.exports = router
 

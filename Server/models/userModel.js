@@ -69,6 +69,18 @@ async function consumeDeviceChallenge(db, deviceKeyId) {
   )
 }
 
+async function removeBiometricDevice(db, userId, deviceKeyId) {
+  const collection = await getUsersCollection(db)
+  const now = new Date()
+  await collection.updateOne(
+    { _id: userId },
+    {
+      $pull: { biometricDevices: { deviceKeyId } },
+      $set: { updatedAt: now },
+    }
+  )
+}
+
 module.exports = {
   getUsersCollection,
   insertUser,
@@ -77,6 +89,7 @@ module.exports = {
   , findUserByDeviceKeyId
   , setDeviceChallenge
   , consumeDeviceChallenge
+  , removeBiometricDevice
 }
 
 

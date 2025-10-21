@@ -102,9 +102,13 @@ export function AuthProvider({ children }) {
   }, [rnBiometrics, saveSession])
 
   const resetBiometrics = useCallback(async () => {
+    const deviceKeyId = await AsyncStorage.getItem(STORAGE_KEYS.deviceKeyId)
+    if (deviceKeyId && token) {
+      try { await api.biometricDeregister({ token, deviceKeyId }) } catch (e) { /* ignore for local cleanup */ }
+    }
     try { await rnBiometrics.deleteKeys() } catch (e) {}
     await AsyncStorage.multiRemove([STORAGE_KEYS.deviceKeyId, STORAGE_KEYS.publicKeyPem])
-  }, [rnBiometrics])
+  }, [rnBiometrics, token])
 
   const value = useMemo(() => ({
     token,

@@ -58,6 +58,8 @@ export const api = {
     request('/auth/biometric/challenge', { method: 'POST', body: { deviceKeyId } }),
   biometricVerify: ({ deviceKeyId, challenge, signature }) =>
     request('/auth/biometric/verify', { method: 'POST', body: { deviceKeyId, challenge, signature } }),
+  biometricDeregister: ({ token, deviceKeyId }) =>
+    request('/auth/biometric/deregister', { method: 'POST', token, body: { deviceKeyId } }),
   ping: () => request('/', { method: 'GET' }),
 }
 

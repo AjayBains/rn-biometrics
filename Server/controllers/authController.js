@@ -9,6 +9,7 @@ const {
   findUserByDeviceKeyId,
   setDeviceChallenge,
   consumeDeviceChallenge,
+  removeBiometricDevice,
 } = require('../models/userModel')
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 // 24h
@@ -186,5 +187,21 @@ async function biometricVerify(req, res) {
 module.exports.biometricRegister = biometricRegister
 module.exports.biometricChallenge = biometricChallenge
 module.exports.biometricVerify = biometricVerify
+
+async function biometricDeregister(req, res) {
+  try {
+    const userId = req.user && req.user.userId
+    if (!userId) return res.status(401).json({ error: 'unauthorized' })
+    const { deviceKeyId } = req.body || {}
+    if (!deviceKeyId) return res.status(400).json({ error: 'deviceKeyId required' })
+    await removeBiometricDevice(req.app.locals.db, new ObjectId(userId), deviceKeyId)
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error('biometricDeregister error', err)
+    return res.status(500).json({ error: 'internal error' })
+  }
+}
+
+module.exports.biometricDeregister = biometricDeregister
 
 
