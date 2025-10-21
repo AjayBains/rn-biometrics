@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
 
   const ensureBiometricKeys = useCallback(async () => {
     const { keysExist } = await rnBiometrics.biometricKeysExist()
+    console.log('keysExist', keysExist)
     if (!keysExist) {
       const { publicKey } = await rnBiometrics.createKeys()
       await AsyncStorage.setItem(STORAGE_KEYS.publicKeyPem, publicKey)
@@ -73,6 +74,7 @@ export function AuthProvider({ children }) {
     const existing = await AsyncStorage.getItem(STORAGE_KEYS.publicKeyPem)
     if (!existing) {
       const { publicKey } = await rnBiometrics.createKeys()
+      console.log('publicKey', publicKey)
       await AsyncStorage.setItem(STORAGE_KEYS.publicKeyPem, publicKey)
       return { created: true, publicKeyPem: publicKey }
     }
@@ -82,6 +84,7 @@ export function AuthProvider({ children }) {
   const enableBiometrics = useCallback(async () => {
     if (!token) throw new Error('not logged in')
     const { publicKeyPem } = await ensureBiometricKeys()
+  console.log('publicKeyPem', publicKeyPem)
     const deviceName = Platform.OS
     const { deviceKeyId } = await api.biometricRegister({ token, publicKeyPem, platform: Platform.OS, deviceName })
     await AsyncStorage.setItem(STORAGE_KEYS.deviceKeyId, deviceKeyId)
@@ -95,7 +98,7 @@ export function AuthProvider({ children }) {
     if (!available) throw new Error('biometrics unavailable')
     const { challenge } = await api.biometricChallenge({ deviceKeyId })
     // Force biometric prompt (no device passcode) and sign challenge
-    const { signature } = await rnBiometrics.createSignature({ promptMessage: 'Authenticate with Biometrics', payload: challenge })
+    const { signature } = await rnBiometrics.createSignature({ promptMessage: 'Authenticate with Biometrics for katapult', payload: challenge })
     const res = await api.biometricVerify({ deviceKeyId, challenge, signature })
     await saveSession(res.token, res.user.email)
     return res
