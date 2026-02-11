@@ -6,9 +6,10 @@ import ReactNativeBiometrics, { BiometryTypes } from 'react-native-biometrics';
 
 export default function BiometricFinal() {
   const rnBiometrics = useMemo(
-    () => new ReactNativeBiometrics({ allowDeviceCredentials: true }),
+    () => new ReactNativeBiometrics({ allowDeviceCredentials: false }),
     []
   );
+  const AccessControl = ReactNativeBiometrics.AccessControl || { BIOMETRY_CURRENT_SET: 'BiometryCurrentSet' };
   const navigation = useNavigation();
 
   const [isAvailable, setIsAvailable] = useState(false);
@@ -65,14 +66,15 @@ export default function BiometricFinal() {
     try {
       const status = await rnBiometrics.biometricKeysExist();
       if (!status.keysExist) {
-        const {privatekey, publicKey } = await rnBiometrics.createKeys();
+        const { privatekey, publicKey } = await rnBiometrics.createKeys({
+          accessControl: AccessControl.BIOMETRY_CURRENT_SET,
+        });
         console.log('PublicKey:', publicKey);
         console.log('privateKey:', privatekey);
         setKeysExist(true);
         setMessage(`Keys created. PublicKey length: ${publicKey.length}`);
       } else {
         setKeysExist(true);
-        console.log('publicKey2:', publicKey);
         setMessage('Keys already exist');
       }
     } catch (e) {
