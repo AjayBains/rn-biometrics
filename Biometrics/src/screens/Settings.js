@@ -24,6 +24,7 @@ export default function Settings() {
         setEnabled(false)
       }
       const url = await getBaseUrl()
+      console.log('url***', url)
       setBaseUrlState(url)
     })()
   }, [])

@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
     ;(async () => {
       try {
         const creds = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICES.session })
+        console.log('creds***123fromcontext', creds)
         if (creds) {
           if (creds.password) setToken(creds.password)
           if (creds.username) setEmail(creds.username)
@@ -114,7 +115,13 @@ export function AuthProvider({ children }) {
   console.log('biometryType', biometryType)
     if (!available) throw new Error('biometrics unavailable')
     const { challenge } = await api.biometricChallenge({ deviceKeyId })
-    // Force biometric prompt (no device passcode) and sign challenge
+    // Force biometric prompt just fo rios emulator  ,remove it when to be tested on real ios device
+    if (Platform.OS === 'ios') {
+      const simplePromptResult = await rnBiometrics.simplePrompt({ promptMessage: 'signin to katapult with face id' })
+      if (!simplePromptResult.success) {
+        throw new Error('Biometric authentication failed')
+      }
+    }
     const { signature } = await rnBiometrics.createSignature({ promptMessage: 'Authenticate with Biometrics for katapult', payload: challenge })
     const res = await api.biometricVerify({ deviceKeyId, challenge, signature })
     await saveSession(res.token, res.user.email)

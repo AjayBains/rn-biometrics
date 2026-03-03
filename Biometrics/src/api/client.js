@@ -1,11 +1,13 @@
 import { Platform } from 'react-native'
 import * as Keychain from 'react-native-keychain'
 
-const DEFAULT_HOST = Platform.select({
-  ios: 'http://localhost:3000',
-  android: 'http://10.0.2.2:3000',
-  default: 'http://localhost:3000',
-})
+const DEFAULT_HOST ="https://rn-biometrics.onrender.com";
+// const DEFAULT_HOST = Platform.select({
+//   ios: 'http://localhost:3000',
+//   android: 'http://localhost:3000',
+//   // android: 'http://10.0.2.2:3000',
+//   default: 'http://localhost:3000',
+// })
 
 const STORAGE_KEY = 'api.baseUrl'
 const KEYCHAIN_SERVICE = 'api.baseUrl'
