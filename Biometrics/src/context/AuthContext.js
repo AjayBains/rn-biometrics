@@ -79,6 +79,7 @@ export function AuthProvider({ children }) {
     const { keysExist } = await rnBiometrics.biometricKeysExist()
     console.log('keysExist', keysExist)
     if (!keysExist) {
+      // create private and public keys, private key is automatically stored in the device enclave and never leaves the dvice
       const { publicKey } = await rnBiometrics.createKeys()
       await Keychain.setGenericPassword('publicKey', publicKey, { service: KEYCHAIN_SERVICES.publicKeyPem })
       return { created: true, publicKeyPem: publicKey }
@@ -94,6 +95,7 @@ export function AuthProvider({ children }) {
     return { created: false, publicKeyPem: existing }
   }, [rnBiometrics])
 
+  // enable biometrics and register the device
   const enableBiometrics = useCallback(async () => {
     if (!token) throw new Error('not logged in')
     const { publicKeyPem } = await ensureBiometricKeys()
@@ -122,6 +124,7 @@ export function AuthProvider({ children }) {
         throw new Error('Biometric authentication failed')
       }
     }
+    //  uses private key behind the scenes  to sign the challenge( private key never leaves the device)
     const { signature } = await rnBiometrics.createSignature({ promptMessage: 'Authenticate with Biometrics for katapult', payload: challenge })
     const res = await api.biometricVerify({ deviceKeyId, challenge, signature })
     await saveSession(res.token, res.user.email)
