@@ -1,14 +1,13 @@
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as Keychain from 'react-native-keychain'
 import ReactNativeBiometrics from 'react-native-biometrics'
 import { api } from '../api/client'
 import { Platform } from 'react-native'
 
 export const AuthContext = createContext(null)
 
-const STORAGE_KEYS = {
-  token: 'auth.token',
-  email: 'auth.email',
+const KEYCHAIN_SERVICES = {
+  session: 'auth.session',
   deviceKeyId: 'bio.deviceKeyId',
   publicKeyPem: 'bio.publicKeyPem',
 }
@@ -21,12 +20,16 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     ;(async () => {
-      const [t, e] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.token),
-        AsyncStorage.getItem(STORAGE_KEYS.email),
-      ])
-      if (t) setToken(t)
-      if (e) setEmail(e)
+      try {
+        const creds = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICES.session })
+        console.log('creds***123fromcontext', creds)
+        if (creds) {
+          if (creds.password) setToken(creds.password)
+          if (creds.username) setEmail(creds.username)
+        }
+      } catch (e) {
+        console.warn('[Auth] failed to load session from keychain', e)
+      }
       setInitializing(false)
     })()
   }, [])
@@ -34,16 +37,25 @@ export function AuthProvider({ children }) {
   const saveSession = useCallback(async (nextToken, nextEmail) => {
     setToken(nextToken)
     setEmail(nextEmail)
-    await AsyncStorage.multiSet([
-      [STORAGE_KEYS.token, nextToken || ''],
-      [STORAGE_KEYS.email, nextEmail || ''],
-    ])
+    try {
+      if (nextToken && nextEmail) {
+        await Keychain.setGenericPassword(nextEmail, nextToken, { service: KEYCHAIN_SERVICES.session })
+      } else {
+        await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICES.session })
+      }
+    } catch (e) {
+      console.warn('[Auth] failed to save session to keychain', e)
+    }
   }, [])
 
   const clearSession = useCallback(async () => {
     setToken(null)
     setEmail(null)
-    await AsyncStorage.multiRemove([STORAGE_KEYS.token, STORAGE_KEYS.email])
+    try {
+      await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICES.session })
+    } catch (e) {
+      console.warn('[Auth] failed to clear session from keychain', e)
+    }
   }, [])
 
   const register = useCallback(async ({ email, password }) => {
@@ -67,37 +79,52 @@ export function AuthProvider({ children }) {
     const { keysExist } = await rnBiometrics.biometricKeysExist()
     console.log('keysExist', keysExist)
     if (!keysExist) {
+      // create private and public keys, private key is automatically stored in the device enclave and never leaves the dvice
       const { publicKey } = await rnBiometrics.createKeys()
-      await AsyncStorage.setItem(STORAGE_KEYS.publicKeyPem, publicKey)
+      await Keychain.setGenericPassword('publicKey', publicKey, { service: KEYCHAIN_SERVICES.publicKeyPem })
       return { created: true, publicKeyPem: publicKey }
     }
-    const existing = await AsyncStorage.getItem(STORAGE_KEYS.publicKeyPem)
+    const existingCreds = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICES.publicKeyPem })
+    const existing = existingCreds ? existingCreds.password : null
     if (!existing) {
       const { publicKey } = await rnBiometrics.createKeys()
       console.log('publicKey', publicKey)
-      await AsyncStorage.setItem(STORAGE_KEYS.publicKeyPem, publicKey)
+      await Keychain.setGenericPassword('publicKey', publicKey, { service: KEYCHAIN_SERVICES.publicKeyPem })
       return { created: true, publicKeyPem: publicKey }
     }
     return { created: false, publicKeyPem: existing }
   }, [rnBiometrics])
 
+  // enable biometrics and register the device
   const enableBiometrics = useCallback(async () => {
     if (!token) throw new Error('not logged in')
     const { publicKeyPem } = await ensureBiometricKeys()
   console.log('publicKeyPem', publicKeyPem)
     const deviceName = Platform.OS
     const { deviceKeyId } = await api.biometricRegister({ token, publicKeyPem, platform: Platform.OS, deviceName })
-    await AsyncStorage.setItem(STORAGE_KEYS.deviceKeyId, deviceKeyId)
+    await Keychain.setGenericPassword('deviceKeyId', deviceKeyId, { service: KEYCHAIN_SERVICES.deviceKeyId })
     return { deviceKeyId }
   }, [token, ensureBiometricKeys])
 
   const biometricLogin = useCallback(async () => {
-    const deviceKeyId = await AsyncStorage.getItem(STORAGE_KEYS.deviceKeyId)
+    const deviceKeyCreds = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICES.deviceKeyId })
+    console.log('deviceKeyCreds***', deviceKeyCreds)
+    const deviceKeyId = deviceKeyCreds ? deviceKeyCreds.password : null
+    console.log('deviceKeyId on trying to login', deviceKeyId)
     if (!deviceKeyId) throw new Error('biometrics not enabled on this device')
     const { available, biometryType } = await rnBiometrics.isSensorAvailable()
+  console.log('available', available)
+  console.log('biometryType', biometryType)
     if (!available) throw new Error('biometrics unavailable')
     const { challenge } = await api.biometricChallenge({ deviceKeyId })
-    // Force biometric prompt (no device passcode) and sign challenge
+    // Force biometric prompt just fo rios emulator  ,remove it when to be tested on real ios device
+    if (Platform.OS === 'ios') {
+      const simplePromptResult = await rnBiometrics.simplePrompt({ promptMessage: 'signin to katapult with face id' })
+      if (!simplePromptResult.success) {
+        throw new Error('Biometric authentication failed')
+      }
+    }
+    //  uses private key behind the scenes  to sign the challenge( private key never leaves the device)
     const { signature } = await rnBiometrics.createSignature({ promptMessage: 'Authenticate with Biometrics for katapult', payload: challenge })
     const res = await api.biometricVerify({ deviceKeyId, challenge, signature })
     await saveSession(res.token, res.user.email)
@@ -105,12 +132,18 @@ export function AuthProvider({ children }) {
   }, [rnBiometrics, saveSession])
 
   const resetBiometrics = useCallback(async () => {
-    const deviceKeyId = await AsyncStorage.getItem(STORAGE_KEYS.deviceKeyId)
+    const deviceKeyCreds = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICES.deviceKeyId })
+    const deviceKeyId = deviceKeyCreds ? deviceKeyCreds.password : null
     if (deviceKeyId && token) {
       try { await api.biometricDeregister({ token, deviceKeyId }) } catch (e) { /* ignore for local cleanup */ }
     }
     try { await rnBiometrics.deleteKeys() } catch (e) {}
-    await AsyncStorage.multiRemove([STORAGE_KEYS.deviceKeyId, STORAGE_KEYS.publicKeyPem])
+    try {
+      await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICES.deviceKeyId })
+      await Keychain.resetGenericPassword({ service: KEYCHAIN_SERVICES.publicKeyPem })
+    } catch (e) {
+      console.warn('[Auth] failed to clear biometric data from keychain', e)
+    }
   }, [rnBiometrics, token])
 
   const value = useMemo(() => ({

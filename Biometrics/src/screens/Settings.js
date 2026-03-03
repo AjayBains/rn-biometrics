@@ -1,9 +1,10 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { View, Text, Button, StyleSheet, Switch, TextInput } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as Keychain from 'react-native-keychain'
 import { AuthContext } from '../context/AuthContext'
 import { getBaseUrl, setBaseUrl, api } from '../api/client'
-const STORAGE_KEY = 'bio.deviceKeyId'
+
+const DEVICE_KEYCHAIN_SERVICE = 'bio.deviceKeyId'
 
 export default function Settings() {
   const { enableBiometrics, resetBiometrics } = useContext(AuthContext)
@@ -14,9 +15,16 @@ export default function Settings() {
 
   useEffect(() => {
     ;(async () => {
-      const id = await AsyncStorage.getItem(STORAGE_KEY)
-      setEnabled(Boolean(id))
+      try {
+        const creds = await Keychain.getGenericPassword({ service: DEVICE_KEYCHAIN_SERVICE })
+        const id = creds ? creds.password : null
+        setEnabled(Boolean(id))
+      } catch (e) {
+        console.warn('[Settings] failed to read biometric state from keychain', e)
+        setEnabled(false)
+      }
       const url = await getBaseUrl()
+      console.log('url***', url)
       setBaseUrlState(url)
     })()
   }, [])

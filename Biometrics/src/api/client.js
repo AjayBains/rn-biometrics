@@ -1,21 +1,35 @@
 import { Platform } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as Keychain from 'react-native-keychain'
 
-const DEFAULT_HOST = Platform.select({
-  ios: 'http://localhost:3000',
-  android: 'http://10.0.2.2:3000',
-  default: 'http://localhost:3000',
-})
+const DEFAULT_HOST ="https://rn-biometrics.onrender.com";
+// const DEFAULT_HOST = Platform.select({
+//   ios: 'http://localhost:3000',
+//   android: 'http://localhost:3000',
+//   // android: 'http://10.0.2.2:3000',
+//   default: 'http://localhost:3000',
+// })
 
 const STORAGE_KEY = 'api.baseUrl'
+const KEYCHAIN_SERVICE = 'api.baseUrl'
 
 export async function getBaseUrl() {
-  const stored = await AsyncStorage.getItem(STORAGE_KEY)
-  return stored || DEFAULT_HOST
+  try {
+    const creds = await Keychain.getGenericPassword({ service: KEYCHAIN_SERVICE })
+    if (creds && creds.password) {
+      return creds.password
+    }
+  } catch (e) {
+    console.warn('[API] getBaseUrl keychain error', e)
+  }
+  return DEFAULT_HOST
 }
 
 export async function setBaseUrl(url) {
-  await AsyncStorage.setItem(STORAGE_KEY, url)
+  try {
+    await Keychain.setGenericPassword(STORAGE_KEY, url, { service: KEYCHAIN_SERVICE })
+  } catch (e) {
+    console.warn('[API] setBaseUrl keychain error', e)
+  }
 }
 
 async function request(path, { method = 'GET', token, body } = {}) {
@@ -30,6 +44,7 @@ async function request(path, { method = 'GET', token, body } = {}) {
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+  console.log('[API] response', res)
   const text = await res.text()
   let data
   try {
@@ -45,7 +60,7 @@ async function request(path, { method = 'GET', token, body } = {}) {
     console.log('[API] error', method, url, 'status', res.status, 'timeMs', Date.now() - started, 'body', data)
     throw err
   }
-  console.log('[API] success', method, url, 'timeMs', Date.now() - started)
+  console.log('[API] success', method, url, 'timeMs', Date.now() - started, 'data', data)
   return data
 }
 

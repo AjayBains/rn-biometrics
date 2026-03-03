@@ -114,16 +114,21 @@ async function biometricRegister(req, res) {
     const alreadyOnUser = (user.biometricDevices || []).some(d => d.deviceKeyId === deviceKeyId)
     if (!alreadyOnUser) {
       await addBiometricDevice(db, user._id, {
+        // deviceKeyId is the id of the device, it is used to identify the device
         deviceKeyId,
+        //  publickeypem never leaves the server, it is used to verify the signature
         publicKeyPem: normalizedPem,
+        // platform is the platform of the device, it is used to identify the device
         platform: platform || 'unknown',
+        // deviceName is the name of the device, it is used to identify the device
         deviceName: deviceName || 'device',
       })
     }
+    //  return the deviceKeyId
 
     return res.status(201).json({ deviceKeyId })
   } catch (err) {
-    console.error('biometricChallenge error', err)
+    console.error('biometric register error', err)
     return res.status(500).json({ error: 'internal error' })
   }
 }
@@ -136,7 +141,7 @@ async function biometricChallenge(req, res) {
     const db = req.app.locals.db
     const user = await findUserByDeviceKeyId(db, deviceKeyId)
     if (!user) return res.status(404).json({ error: 'device not found' })
-
+//  generate a challenge(nonce, one time use data to be signed) for the device
     const challenge = crypto.randomBytes(32).toString('base64url')
     const expiresAt = new Date(Date.now() + 2 * 60 * 1000) // 2 minutes
     await setDeviceChallenge(db, deviceKeyId, challenge, expiresAt)
@@ -161,12 +166,16 @@ async function biometricVerify(req, res) {
     const pending = device.pendingChallenge
     if (!pending) return res.status(400).json({ error: 'no pending challenge' })
     if (pending.challenge !== challenge) return res.status(400).json({ error: 'challenge mismatch' })
+      // if 2 minutes have passed(correct biometric not presented till two minutes ) , the challenge is expired
     if (new Date(pending.expiresAt).getTime() < Date.now()) return res.status(400).json({ error: 'challenge expired' })
 
     const verifier = crypto.createVerify('RSA-SHA256')
-    verifier.update(challenge)
+    //adds challenge data to be verified
+    verifier.update(challenge)  
     verifier.end()
+    //converts signature to base64
     const sigB64 = String(signature).replace(/-/g, '+').replace(/_/g, '/')
+    //verifies the signature using  pem
     const ok = verifier.verify(toPemIfNeeded(device.publicKeyPem), Buffer.from(sigB64, 'base64'))
     if (!ok) {
       console.error('biometricVerify invalid signature for deviceKeyId', deviceKeyId)
@@ -194,6 +203,7 @@ async function biometricDeregister(req, res) {
     if (!userId) return res.status(401).json({ error: 'unauthorized' })
     const { deviceKeyId } = req.body || {}
     if (!deviceKeyId) return res.status(400).json({ error: 'deviceKeyId required' })
+      // on de register remove the biometric device from the user's data
     await removeBiometricDevice(req.app.locals.db, new ObjectId(userId), deviceKeyId)
     return res.json({ ok: true })
   } catch (err) {
